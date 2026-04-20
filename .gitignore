@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Environment
+.env.local
+.env*.local
+
+# User data (contains passwords and studies)
+data/
+
+# Misc
+.DS_Store
+*.log
