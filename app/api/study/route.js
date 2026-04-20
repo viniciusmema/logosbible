@@ -37,9 +37,10 @@ export async function POST(request) {
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
+    const stream = client.messages.stream({
+      model: "claude-opus-4-7",
+      max_tokens: 8000,
+      thinking: { type: "adaptive" },
       system: SYSTEM_PROMPT,
       messages: [
         {
@@ -48,6 +49,8 @@ export async function POST(request) {
         },
       ],
     });
+
+    const message = await stream.finalMessage();
 
     const text = message.content
       .filter((b) => b.type === "text")
