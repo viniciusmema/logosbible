@@ -1,93 +1,114 @@
-# Lógos — Estudos Bíblicos
+# IDE Scriptum
 
-Aplicação pessoal de estudos bíblicos com geração via IA. Para cada bloco de capítulos lido, gera um estudo completo com contexto histórico, autoria, estrutura literária, curiosidades culturais e seção devocional.
+## Geração provisória de conteúdo
 
----
+A interface chama somente as rotas em `app/api/studies`. As funções públicas
+`generateBibleStudy()` e `generateDevotional()` ficam em
+`lib/content-generation/index.ts`; o acesso ao provedor está isolado em
+`lib/content-generation/gemini-provider.ts`.
 
-## Pré-requisitos
+Configure `GEMINI_API_KEY` como segredo do ambiente do servidor. O modelo pode
+ser alterado com `GEMINI_MODEL` (o padrão provisório é `gemini-3.6-flash`). Nenhuma
+credencial deve ser adicionada ao código ou exposta ao navegador. Para migrar
+para outro backend ou provedor, mantenha os contratos das duas funções públicas
+e substitua apenas a implementação da camada `content-generation`.
 
-- [Node.js 18+](https://nodejs.org/)
-- Uma chave de API da Anthropic → [console.anthropic.com](https://console.anthropic.com)
+## Leitor bíblico
 
----
+O texto bíblico é carregado pela API oficial da YouVersion através das rotas em
+`app/api/bible`. Configure `YOUVERSION_APP_KEY` como segredo do servidor. A
+interface lista as traduções em português liberadas para essa chave, prioriza
+NVI, NVT e NTLH quando disponíveis e não armazena o texto integral das
+traduções no projeto.
 
-## Setup
+A clean full-stack starter running on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.
 
-### 1. Instalar dependências
+## Prerequisites
 
-```bash
-npm install
+- Node.js `>=22.13.0`
+- Linux with `flock`, `curl`, and GNU `timeout`
+
+## Sites Lifecycle
+
+The Sites lifecycle CLI runs the locked dependency install before returning this checkout. Edit the source under `app/`, then checkpoint when a coherent milestone is ready to inspect or share. The remote Sites builder runs `npm run build` against the pushed commit. Do not repeat install or build as a normal pre-checkpoint step.
+
+This starter does not use `wrangler.jsonc`.
+
+`install:ci` is intentionally a single, non-retrying `npm ci`. It refuses a concurrent install for the same project, consumes a matching image-seeded npm cache with `--prefer-offline` while retaining registry fallback for a missing cache object, otherwise downloads and verifies the complete vinext tarball recorded in `package-lock.json`, limits npm to one socket, and terminates a stalled install. `build` applies a short timeout. These helpers target Linux and use GNU `timeout`; they are not native macOS scripts.
+
+Scripts that need writable project-scoped home, npm, XDG, and temporary paths use `scripts/sites-env.sh`. The `dev` and `start` scripts honor the caller's runtime environment and keep Wrangler logs inside the checkout. The generated `.sites-runtime/` directory is disposable and ignored by Git.
+
+## Included Shape
+
+- edit site code under `app/`
+- `app/chatgpt-auth.ts` provides optional dispatch-owned ChatGPT sign-in helpers
+- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
+- `vite.config.ts` simulates declared bindings for local development
+- `db/index.ts` reads the D1 binding from the Cloudflare Worker environment
+- `db/schema.ts` starts intentionally empty
+- `examples/d1/` contains an optional D1 example surface
+- `drizzle.config.ts` supports local migration generation when needed
+
+## Workspace Auth Headers
+
+OpenAI workspace sites can read the current user's email from `oai-authenticated-user-email`.
+
+SIWC-authenticated workspace sites may also receive `oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty `name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by `oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
+
+Treat the full name as optional and fall back to email when it is absent:
+
+```tsx
+import { headers } from "next/headers";
+
+export default async function Home() {
+  const requestHeaders = await headers();
+  const email = requestHeaders.get("oai-authenticated-user-email");
+  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
+  const fullName =
+    encodedFullName &&
+    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
+      "percent-encoded-utf-8"
+      ? decodeURIComponent(encodedFullName)
+      : null;
+
+  const displayName = fullName ?? email;
+  // ...
+}
 ```
 
-### 2. Configurar a chave de API
+## Optional Dispatch-Owned ChatGPT Sign-In
 
-Crie um arquivo `.env.local` na raiz do projeto:
+Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs optional or required ChatGPT sign-in:
 
-```bash
-cp .env.local.example .env.local
-```
+- Use `getChatGPTUser()` for optional signed-in UI.
+- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send anonymous visitors through Sign in with ChatGPT.
+- In a Server Component, start sign-in with `<a href={chatGPTSignInPath(returnTo)} target="_top">`. The auth helper module is server-only; do not import it into a Client Component.
+- Do not use `fetch`, XHR, a client-side router, or a framework link that can prefetch the sign-in route. SIWC must start as a top-level navigation.
+- Never request the AuthAPI authorization endpoint directly. The dispatch-owned `/signin-with-chatgpt` route must start the SIWC flow.
+- Use `chatGPTSignOutPath(returnTo)` for browser sign-out links or actions.
+- Pass a same-origin relative `returnTo` path for the destination after sign-in or sign-out. The helper validates and safely encodes it.
+- Mark protected pages with `export const dynamic = "force-dynamic"` because they depend on per-request identity headers.
 
-Abra o `.env.local` e substitua pelo valor real:
+Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the OAuth cookies, and identity header injection. Do not implement app routes for those reserved paths. Routes that do not import and call the helper remain anonymous-compatible.
 
-```
-ANTHROPIC_API_KEY=sk-ant-api03-sua-chave-aqui
-```
+SIWC establishes identity only; it does not prove workspace membership. Use the Sites hosting platform's access policy controls for workspace-wide restrictions, or enforce explicit server-side membership or allowlist checks.
 
-### 3. Rodar em desenvolvimento
+Use SIWC for account pages, user-specific dashboards, saved records, and write actions tied to the current ChatGPT user. Leave public content anonymous.
 
-```bash
-npm run dev
-```
+## Diagnostic Commands
 
-Acesse: [http://localhost:3000](http://localhost:3000)
+- `npm run install:ci`: perform the one bounded lockfile install
+- `npm run dev`: start the Vite/Vinext development server
+- `npm run build`: build the deployable Sites artifact
+- `npm run start`: start the built Vinext application
+- `npm test`: build and verify the rendered development-preview metadata
+- `npm run db:generate`: generate Drizzle migrations after schema changes
 
----
+Use build commands for targeted diagnosis after a remote failure, not as part of the normal checkpoint path.
 
-## Estrutura do projeto
+The timeout defaults can be overridden for a controlled canary with `SITES_INSTALL_TIMEOUT`, `SITES_INSTALL_KILL_AFTER`, `SITES_BUILD_TIMEOUT`, and `SITES_BUILD_KILL_AFTER`. A timeout fails the command; the helpers never retry an unchanged install or build.
 
-```
-logos-nextjs/
-├── app/
-│   ├── api/
-│   │   └── study/
-│   │       └── route.js       # Chamada à API da Anthropic (server-side)
-│   ├── layout.jsx
-│   └── page.jsx
-├── components/
-│   └── LogosApp.jsx           # Toda a UI da aplicação
-├── .env.local.example
-├── next.config.js
-└── package.json
-```
+## Learn More
 
----
-
-## Como funciona
-
-- A UI roda no browser, os estudos ficam salvos no `localStorage`
-- Quando você gera um estudo, a requisição vai para `/api/study` (server-side)
-- O servidor chama a API da Anthropic com sua chave — ela nunca fica exposta no browser
-- O estudo retorna em JSON estruturado e é salvo localmente
-
----
-
-## Deploy (opcional)
-
-O jeito mais simples é via [Vercel](https://vercel.com):
-
-```bash
-npm i -g vercel
-vercel
-```
-
-Durante o deploy, adicione a variável `ANTHROPIC_API_KEY` nas configurações de ambiente do projeto na Vercel.
-
----
-
-## Próximos passos sugeridos
-
-- [ ] Exportar estudo como PDF
-- [ ] Modo de busca entre estudos salvos
-- [ ] Sincronização com banco de dados (para multi-dispositivo)
-- [ ] Seleção de tradução por estudo
-- [ ] Modo de leitura focado (fullscreen sem sidebar)
+- [vinext Documentation](https://github.com/cloudflare/vinext)
+- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)

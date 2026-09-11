@@ -1,0 +1,1 @@
+ALTER TABLE `studies` ADD `reader_prompt` text DEFAULT '' NOT NULL;

@@ -1,0 +1,1 @@
+ALTER TABLE `studies` ADD `generation_mode` text DEFAULT 'deep' NOT NULL;
