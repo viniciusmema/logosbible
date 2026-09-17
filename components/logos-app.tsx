@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, BookCheck, BookMarked, BookOpen, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, Feather, House, Library, LoaderCircle, Minus, NotebookPen, Plus, Settings, Sparkles, Trash2, User, X } from "lucide-react";
+import { BarChart3, BookCheck, BookMarked, BookOpen, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, Feather, House, Library, ListChecks, LoaderCircle, Minus, NotebookPen, Plus, Settings, Sparkles, Trash2, User, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,9 +16,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BOOKS } from "@/lib/bible";
 import { BIBLE_CHAPTERS, EMPTY_PROGRESS, PROGRESS_STORAGE_KEY, TOTAL_BIBLE_CHAPTERS, progressSummary, registerStudy, type BibleProgress } from "@/lib/bible-progress";
-import type { BibleStudyContent, BiblicalConnection, DailyStudy, DeepStudy, GenerationMode, Study } from "@/lib/logos-types";
+import type { BibleStudyContent, BiblicalConnection, DailyStudy, DeepStudy, GenerationMode, Study, DailyLesson } from "@/lib/logos-types";
+import { GOVERNO_PROPRIO } from "@/lib/study-programs/governo-proprio";
 
-type Mode = "home" | "create" | "view" | "progress" | "caderno" | "bible" | "profile";
+type Mode = "home" | "create" | "view" | "progress" | "caderno" | "bible" | "profile" | "studies" | "program";
+const PROGRAM_PROGRESS_KEY = "ide_scriptum_program_progress_v1";
 
 type BibleVersion = { id: number; abbreviation: string; title: string; preferred: boolean; copyright: string; info: string; publisherUrl: string | null; youVersionUrl: string | null };
 type BiblePassage = { id: string; reference: string; content: string };
@@ -31,12 +33,13 @@ function formatDate(value: string) {
   return new Date(value.endsWith("Z") ? value : `${value}Z`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function StudyHistory({ studies, selected, mode, collapsed = false, onOpen, onNew, onBible, onProgress }: { studies: Study[]; selected: Study | null; mode: Mode; collapsed?: boolean; onOpen: (study: Study) => void; onNew: () => void; onBible: () => void; onProgress: () => void }) {
+function StudyHistory({ studies, selected, mode, collapsed = false, onOpen, onNew, onBible, onProgress, onStudies }: { studies: Study[]; selected: Study | null; mode: Mode; collapsed?: boolean; onOpen: (study: Study) => void; onNew: () => void; onBible: () => void; onProgress: () => void; onStudies: () => void }) {
   return (
     <div className="history-shell">
       <Button variant="outline" className="new-study-button" onClick={onNew} title={collapsed ? "Novo estudo" : undefined} aria-label={collapsed ? "Novo estudo" : undefined}><Plus /><span>Novo estudo</span></Button>
       <Button variant="ghost" className={`progress-nav ${mode === "bible" ? "active" : ""}`} onClick={onBible} title={collapsed ? "Bíblia" : undefined} aria-label={collapsed ? "Bíblia" : undefined}><BookMarked /><span>Bíblia</span></Button>
       <Button variant="ghost" className={`progress-nav ${mode === "progress" ? "active" : ""}`} onClick={onProgress} title={collapsed ? "Progresso" : undefined} aria-label={collapsed ? "Progresso" : undefined}><BarChart3 /><span>Progresso</span></Button>
+      <Button variant="ghost" className={`progress-nav ${mode === "studies" || mode === "program" ? "active" : ""}`} onClick={onStudies} title={collapsed ? "Estudos" : undefined} aria-label={collapsed ? "Estudos" : undefined}><ListChecks /><span>Estudos</span></Button>
       <div className="history-heading" title={collapsed ? "Seu caderno" : undefined}><Library /> <span>Seu caderno</span><b>{studies.length}</b></div>
       <div className="history-list">
         {studies.length === 0 ? (
@@ -104,6 +107,11 @@ function ProgressScreen({ progress }: { progress: BibleProgress }) {
 function NotebookScreen({ studies, selected, onOpen, onNew }: { studies: Study[]; selected: Study | null; onOpen: (study: Study) => void; onNew: () => void }) {
   return <div className="notebook-view"><header className="notebook-header"><div><p className="eyebrow">Biblioteca pessoal</p><h1>Caderno</h1></div><span>{studies.length} {studies.length === 1 ? "estudo" : "estudos"}</span></header>{studies.length === 0 ? <div className="notebook-empty"><BookOpen /><h2>Seu caderno está vazio.</h2><p>O primeiro estudo que você gerar ficará guardado aqui.</p><Button onClick={onNew}><Plus /> Novo estudo</Button></div> : <div className="notebook-grid">{studies.map((study) => <button className={`notebook-card ${selected?.id === study.id ? "active" : ""}`} key={study.id} onClick={() => onOpen(study)}><span>{study.book} · {study.chapters}</span><strong>{study.title}</strong><small>{study.generationMode === "daily" ? "Modo Diário" : "Modo Aprofundado"} · {formatDate(study.createdAt)}</small></button>)}</div>}</div>;
 }
+
+function ProgramsScreen({ onOpen }: { onOpen: () => void }) { return <div className="notebook-view"><header className="notebook-header"><div><p className="eyebrow">Formação guiada</p><h1>Estudos</h1></div><span>1 programa</span></header><div className="notebook-grid"><button className="notebook-card" onClick={onOpen}><span>{GOVERNO_PROPRIO.duration}</span><strong>{GOVERNO_PROPRIO.title}</strong><small>{GOVERNO_PROPRIO.subtitle} · Livro atual: {GOVERNO_PROPRIO.currentBook}</small></button></div></div>; }
+
+function ProgramScreen({ progress, onChange, devotional, devotionalLoading, onGenerate }: { progress: Record<string, boolean>; onChange: (next: Record<string, boolean>) => void; devotional: DevotionalStudy | null; devotionalLoading: boolean; onGenerate: () => void }) { const lesson = GOVERNO_PROPRIO.lessons[0]; const checked = progress[lesson.id] ?? false; const done = checked ? 4 : 0; return <div className="study-view program-view"><header className="study-header"><div><p className="eyebrow">Estudos · {GOVERNO_PROPRIO.title}</p><h1>{GOVERNO_PROPRIO.title}</h1><small>{GOVERNO_PROPRIO.subtitle}</small></div></header><section className="program-overview"><p className="eyebrow">Livro atual</p><h2>{GOVERNO_PROPRIO.currentBook}</h2><p>{GOVERNO_PROPRIO.currentAuthor} · Leitura obrigatória</p><Progress value={checked ? 100 : 0} /><small>{done}/4 itens concluídos · Dia 1 de 30</small></section><div className="program-days"><button className="selected">Dia 1<strong>Hoje</strong></button><button disabled>Dia 2<strong>Próximo</strong></button><button disabled>Dia 3<strong>Próximo</strong></button></div><Section label="Tema"><p>{lesson.theme}</p></Section><Section label="Objetivo"><p>{lesson.objective}</p></Section><Section label="Leitura obrigatória"><p>{lesson.requiredBook}</p><strong>{lesson.requiredBookSection}</strong></Section><Section label="Leitura bíblica principal"><p>{lesson.bible}</p><small>Complementares: {lesson.complementary.join(" · ")}</small></Section><Section label="Devocional do dia">{devotional ? <><div className="key-verse"><span>{devotional.verso_chave.referencia}</span><blockquote>“{devotional.verso_chave.texto}”</blockquote></div><p>{devotional.meditacao}</p><div className="prayer"><span>Oração</span><p>{devotional.oracao}</p></div></> : <div className="devotional-empty"><p>O devocional será gerado especificamente a partir do tema, da Bíblia e da leitura de {GOVERNO_PROPRIO.currentBook}.</p><Button onClick={onGenerate} disabled={devotionalLoading}>{devotionalLoading ? <><LoaderCircle className="spin" /> Gerando...</> : <><Sparkles /> Gerar devocional de hoje</>}</Button></div>}</Section><Section label="Perguntas de reflexão"><div className="interpretation-list">{lesson.questions.map((q) => <p key={q}>{q}</p>)}</div></Section><Section label="Checklist do dia"><div className="journey-checklist"><label><input type="checkbox" checked={checked} onChange={(e) => onChange({ ...progress, [lesson.id]: e.target.checked })} /><span>Concluir as leituras e o estudo do dia</span></label><label><input type="checkbox" checked={checked} readOnly /><span>Responder às perguntas e registrar a aplicação</span></label><label><input type="checkbox" checked={checked} readOnly /><span>Fazer a oração</span></label><label><input type="checkbox" checked={checked} readOnly /><span>Concluir o estudo do dia</span></label></div></Section><div className="prayer"><span>Fluxo da jornada</span><p>LER → COMPREENDER → REFLETIR → ORAR → OBEDECER → PRATICAR</p></div></div>; }
+
 
 function ProfileScreen({ preferences, onChange, progress, studies, avatarInputRef, onAvatar }: { preferences: ReaderPreferences; onChange: (next: ReaderPreferences) => void; progress: BibleProgress; studies: Study[]; avatarInputRef: React.RefObject<HTMLInputElement | null>; onAvatar: (file: File) => void }) {
   const summary = progressSummary(progress);
@@ -270,6 +278,15 @@ function StudyContent({ study }: { study: Study }) {
     : <DeepContent content={study.content as DeepStudy} />;
 }
 
+function JourneyContent({ study, onSave }: { study: Study; onSave: (journey: NonNullable<Study["journey"]>) => void }) {
+  if (!study.journey) return null;
+  const lesson = study.journey.lessons[0];
+  const done = lesson.checklist.filter((item) => item.done).length;
+  const percent = Math.round((done / lesson.checklist.length) * 100);
+  const update = (next: DailyLesson) => onSave({ ...study.journey!, lessons: [next, ...study.journey!.lessons.slice(1)], progress: { ...study.journey!.progress, lastActivity: new Date().toISOString(), lastLessonId: next.id } });
+  return <div className="study-body journey-body"><div className="journey-summary"><div><p className="eyebrow">Rotina diária</p><h2>{lesson.title}</h2><p>{lesson.theme}</p></div><Progress value={percent} /><strong>{percent}% · {done}/{lesson.checklist.length} itens</strong></div><Section label="Objetivo"><p>{lesson.objective}</p></Section><Section label="Leitura obrigatória"><p>{lesson.requiredBookReading}</p><strong>{lesson.suggestedBookSection}</strong></Section><Section label="Leitura bíblica principal"><p>{lesson.primaryBibleReading}</p>{lesson.complementaryBibleReadings.length > 0 && <small>Complementares: {lesson.complementaryBibleReadings.join(" · ")}</small>}</Section><Section label="Checklist"><div className="journey-checklist">{lesson.checklist.map((item) => <label key={item.id}><input type="checkbox" checked={item.done} onChange={(event) => { const next = { ...lesson, checklist: lesson.checklist.map((current) => current.id === item.id ? { ...current, done: event.target.checked } : current), status: event.target.checked && done + 1 === lesson.checklist.length ? "completed" : "in_progress" as const }; update(next); }} /><span>{item.label}</span></label>)}</div></Section><Section label="Perguntas de reflexão"><div className="interpretation-list">{lesson.reflectionQuestions.map((question) => <p key={question}>{question}</p>)}</div></Section><Section label="O que Deus me mostrou?"><Textarea value={lesson.answers.showedMe} onChange={(e) => update({ ...lesson, answers: { ...lesson.answers, showedMe: e.target.value } })} /></Section><Section label="Onde isso confronta meu comportamento?"><Textarea value={lesson.answers.confrontsBehavior} onChange={(e) => update({ ...lesson, answers: { ...lesson.answers, confrontsBehavior: e.target.value } })} /></Section><Section label="O que preciso obedecer hoje?"><Textarea value={lesson.answers.obeyToday} onChange={(e) => update({ ...lesson, answers: { ...lesson.answers, obeyToday: e.target.value } })} /></Section><Section label="Qual ação prática vou cumprir?"><Textarea value={lesson.answers.practicalAction} onChange={(e) => update({ ...lesson, answers: { ...lesson.answers, practicalAction: e.target.value } })} /></Section><Section label="Oração pessoal"><Textarea value={lesson.answers.personalPrayer} onChange={(e) => update({ ...lesson, answers: { ...lesson.answers, personalPrayer: e.target.value } })} /></Section><Section label="Observações"><Textarea value={lesson.answers.observations} onChange={(e) => update({ ...lesson, answers: { ...lesson.answers, observations: e.target.value } })} /></Section></div>;
+}
+
 export default function LogosApp({ displayName }: { displayName: string }) {
   const [studies, setStudies] = useState<Study[]>([]);
   const [selected, setSelected] = useState<Study | null>(null);
@@ -308,11 +325,19 @@ export default function LogosApp({ displayName }: { displayName: string }) {
   const [noteOpen, setNoteOpen] = useState(false);
   const [preferences, setPreferences] = useState<ReaderPreferences>({ preferredName: "", avatar: null, defaultMode: "daily" });
   const [profileReady, setProfileReady] = useState(false);
+  const [programProgress, setProgramProgress] = useState<Record<string, boolean>>({});
+  const [programDevotional, setProgramDevotional] = useState<DevotionalStudy | null>(null);
+  const [programDevotionalLoading, setProgramDevotionalLoading] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const accountName = useMemo(() => displayName.includes("@") ? "Leitor" : displayName, [displayName]);
   const firstName = useMemo(() => (preferences.preferredName.trim() || accountName).split(" ")[0], [accountName, preferences.preferredName]);
 
+  useEffect(() => {
+    try { const saved = window.localStorage.getItem(PROGRAM_PROGRESS_KEY); if (saved) setProgramProgress(JSON.parse(saved)); } catch { /* mantém vazio */ }
+    try { const saved = window.localStorage.getItem("ide_scriptum_program_devotional_day1"); if (saved) setProgramDevotional(JSON.parse(saved)); } catch { /* mantém vazio */ }
+  }, []);
+  useEffect(() => { try { window.localStorage.setItem(PROGRAM_PROGRESS_KEY, JSON.stringify(programProgress)); } catch { /* mantém durante a sessão */ } }, [programProgress]);
   useEffect(() => {
     let disposed = false;
     const defaults: ReaderPreferences = { preferredName: "", avatar: null, defaultMode: "daily" };
@@ -487,6 +512,7 @@ export default function LogosApp({ displayName }: { displayName: string }) {
   }, [noteDirty, noteDraft, selected?.id]);
 
   function openStudy(study: Study) { setSelected(study); setMode("view"); setMobileOpen(false); setError(""); }
+  function saveJourney(journey: NonNullable<Study["journey"]>) { if (!selected) return; setSelected({ ...selected, journey }); setStudies((current) => current.map((study) => study.id === selected.id ? { ...study, journey } : study)); void fetch(`/api/studies/${selected.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ journey }) }); }
   function newStudy() { setSelected(null); setMode("create"); setGenerationMode(preferences.defaultMode); setMobileOpen(false); setError(""); }
   function showBible() {
     setSelected(null);
@@ -497,6 +523,9 @@ export default function LogosApp({ displayName }: { displayName: string }) {
   function showProgress() { setSelected(null); setMode("progress"); setMobileOpen(false); setError(""); }
   function showNotebook() { setMode("caderno"); setMobileOpen(false); setError(""); }
   function showProfile() { setMode("profile"); setMobileOpen(false); setError(""); }
+  function showPrograms() { setSelected(null); setMode("studies"); setMobileOpen(false); setError(""); }
+  function openProgram() { setSelected(null); setMode("program"); setMobileOpen(false); setError(""); }
+  async function generateProgramDevotionalNow() { setProgramDevotionalLoading(true); setError(""); try { const response = await fetch("/api/programs/devotional", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lessonId: "day-1" }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error); setProgramDevotional(data.devotional); localStorage.setItem("ide_scriptum_program_devotional_day1", JSON.stringify(data.devotional)); } catch (reason) { setError(reason instanceof Error ? reason.message : "Não foi possível gerar o devocional de hoje."); } finally { setProgramDevotionalLoading(false); } }
 
   function changeReaderBook(nextBook: string) {
     setReaderBook(nextBook);
@@ -589,8 +618,8 @@ export default function LogosApp({ displayName }: { displayName: string }) {
     });
   }
 
-  const history = <StudyHistory studies={studies} selected={selected} mode={mode} onOpen={openStudy} onNew={newStudy} onBible={showBible} onProgress={showProgress} />;
-  const desktopHistory = <StudyHistory studies={studies} selected={selected} mode={mode} collapsed={sidebarCollapsed} onOpen={openStudy} onNew={newStudy} onBible={showBible} onProgress={showProgress} />;
+  const history = <StudyHistory studies={studies} selected={selected} mode={mode} onOpen={openStudy} onNew={newStudy} onBible={showBible} onProgress={showProgress} onStudies={showPrograms} />;
+  const desktopHistory = <StudyHistory studies={studies} selected={selected} mode={mode} collapsed={sidebarCollapsed} onOpen={openStudy} onNew={newStudy} onBible={showBible} onProgress={showProgress} onStudies={showPrograms} />;
 
   return (
     <div className={`logos-app ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
@@ -601,6 +630,7 @@ export default function LogosApp({ displayName }: { displayName: string }) {
       </aside>
 
       <header className="mobile-header">
+        <button className={`mobile-studies-button ${mode === "bible" ? "active" : ""}`} onClick={showBible} aria-label="Abrir Bíblia" aria-current={mode === "bible" ? "page" : undefined}><BookMarked /></button>
         <button className="brand" onClick={() => setMode("home")} aria-label="IDE Scriptum — ir para o início"><img className="brand-logo" src="/scriptum-logo-v2.png" alt="IDE Scriptum" /></button>
         <button className={`mobile-profile-button ${mode === "profile" ? "active" : ""}`} onClick={showProfile} aria-label="Abrir meu perfil" aria-current={mode === "profile" ? "page" : undefined}>
           {preferences.avatar ? <img src={preferences.avatar} alt="" /> : <User />}
@@ -615,6 +645,8 @@ export default function LogosApp({ displayName }: { displayName: string }) {
         {mode === "progress" && <ProgressScreen progress={readingProgress} />}
         {mode === "bible" && <BibleReaderScreen versions={bibleVersions} versionId={readerVersionId} book={readerBook} chapter={readerChapter} passage={readerPassage} loading={passageLoading} versionsLoading={versionsLoading} versionsRequested={versionsRequested} error={readerError} progress={readingProgress} fontSize={readerFontSize} onVersion={setReaderVersionId} onBook={changeReaderBook} onChapter={setReaderChapter} onPrevious={() => navigateReader(-1)} onNext={() => navigateReader(1)} onFontSize={setReaderFontSize} onComplete={completeReaderChapter} onGenerate={studyReaderChapter} onRetry={retryReader} />}
         {mode === "caderno" && <NotebookScreen studies={studies} selected={selected} onOpen={openStudy} onNew={newStudy} />}
+        {mode === "studies" && <ProgramsScreen onOpen={openProgram} />}
+        {mode === "program" && <ProgramScreen progress={programProgress} onChange={setProgramProgress} devotional={programDevotional} devotionalLoading={programDevotionalLoading} onGenerate={generateProgramDevotionalNow} />}
         {mode === "profile" && <ProfileScreen preferences={{ ...preferences, preferredName: preferences.preferredName || accountName }} onChange={setPreferences} progress={readingProgress} studies={studies} avatarInputRef={avatarInputRef} onAvatar={handleAvatar} />}
 
         {mode === "create" && <div className="form-view">
@@ -641,13 +673,13 @@ export default function LogosApp({ displayName }: { displayName: string }) {
         </div>}
 
         {mode === "view" && selected && <article className="study-view"><header className="study-header"><div><div className="study-meta"><p className="eyebrow">{selected.book} · capítulos {selected.chapters}</p><span>{selected.generationMode === "daily" ? "Modo Diário" : "Modo Aprofundado"}</span></div><h1>{selected.title}</h1><small>{formatDate(selected.createdAt)}</small></div><AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" aria-label="Excluir estudo"><Trash2 /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Excluir este estudo?</AlertDialogTitle><AlertDialogDescription>O conteúdo gerado e suas anotações serão apagados definitivamente.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={removeStudy}>Excluir</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></header>
-          <Tabs value={studyTab} onValueChange={(value) => { setStudyTab(value); if (value === "devotional" && !selected.devotional) void createDevotional(); }} className="study-tabs"><TabsList variant="line"><TabsTrigger value="study">Estudo</TabsTrigger><TabsTrigger value="devotional">Devocional</TabsTrigger></TabsList><TabsContent value="study"><StudyContent study={selected} /></TabsContent>
+          <Tabs value={studyTab} onValueChange={(value) => { setStudyTab(value); if (value === "devotional" && !selected.devotional) void createDevotional(); }} className="study-tabs"><TabsList variant="line"><TabsTrigger value="journey">Jornada</TabsTrigger><TabsTrigger value="study">Estudo</TabsTrigger><TabsTrigger value="devotional">Devocional</TabsTrigger></TabsList><TabsContent value="journey"><JourneyContent study={selected} onSave={saveJourney} /></TabsContent><TabsContent value="study"><StudyContent study={selected} /></TabsContent>
             <TabsContent value="devotional" className="study-body devotional-body">{!selected.devotional ? <div className="devotional-empty"><div><Feather /></div><h2>{devotionalLoading ? "Preparando seu devocional..." : "Não foi possível preparar o devocional."}</h2><p>{devotionalLoading ? "Ele será criado uma única vez e guardado junto ao estudo." : "Você pode tentar novamente sem gerar o estudo outra vez."}</p>{devotionalLoading ? <LoaderCircle className="spin devotional-spinner" /> : <Button onClick={createDevotional}><Sparkles /> Tentar novamente</Button>}</div> : <><div className="key-verse"><span>{selected.devotional.verso_chave.referencia}</span><blockquote>“{selected.devotional.verso_chave.texto}”</blockquote></div><Section label="Meditação"><p>{selected.devotional.meditacao}</p></Section>{selected.devotional.revela_sobre_deus && <Section label="O que este texto revela sobre Deus"><p>{selected.devotional.revela_sobre_deus}</p></Section>}{selected.devotional.confronta_em_nos && <Section label="O que este texto confronta ou transforma em nós"><p>{selected.devotional.confronta_em_nos}</p></Section>}<Section label="Aplicação prática"><p>{selected.devotional.aplicacao_pratica ?? selected.devotional.aplicacao}</p></Section>{selected.devotional.pergunta_reflexao && <section className="reflection-question"><span>Pergunta para reflexão</span><p>{selected.devotional.pergunta_reflexao}</p></section>}<div className="prayer"><span>Oração</span><p>{selected.devotional.oracao}</p></div></>}</TabsContent></Tabs></article>}
       </main>
       {mode === "view" && selected && <><button className={`notes-fab ${noteDraft ? "has-note" : ""}`} onClick={() => setNoteOpen(true)} aria-label="Abrir minhas anotações"><NotebookPen />{noteDraft && <i />}</button>{noteOpen && <div className="notes-overlay" onClick={() => setNoteOpen(false)} />}<aside className={`notes-drawer ${noteOpen ? "open" : ""}`} aria-hidden={!noteOpen}><header><div><NotebookPen /><span>Minhas anotações</span></div><span className={`note-status ${noteStatus}`}>{noteStatus === "saving" && <LoaderCircle className="spin" />}{noteStatus === "saved" && "✓ Salvo"}{noteStatus === "error" && "Falha ao salvar"}</span><button onClick={() => setNoteOpen(false)} aria-label="Fechar anotações"><X /></button></header><Textarea autoFocus={noteOpen} value={noteDraft} onChange={(event) => { setNoteDraft(event.target.value); setNoteDirty(true); }} onBlur={flushNote} placeholder="Reflexões, perguntas, conexões pessoais..." maxLength={10000} /><small>{noteDraft.length.toLocaleString("pt-BR")} caracteres</small></aside></>}
       <nav className="mobile-quick-nav" aria-label="Atalhos principais">
         <button className={mode === "home" ? "active" : ""} onClick={() => { setMode("home"); setSelected(null); }} aria-current={mode === "home" ? "page" : undefined}><House /><span>Início</span></button>
-        <button className={mode === "bible" ? "active" : ""} onClick={showBible} aria-current={mode === "bible" ? "page" : undefined}><BookMarked /><span>Bíblia</span></button>
+        <button className={mode === "studies" || mode === "program" ? "active" : ""} onClick={showPrograms} aria-current={mode === "studies" || mode === "program" ? "page" : undefined}><ListChecks /><span>Estudos</span></button>
         <button className={`quick-new ${mode === "create" ? "active" : ""}`} onClick={newStudy} aria-current={mode === "create" ? "page" : undefined}><i className="quick-new-icon"><Plus /></i><span>Novo</span></button>
         <button className={mode === "caderno" || mode === "view" ? "active" : ""} onClick={showNotebook} aria-current={mode === "caderno" ? "page" : undefined}><Library /><span>Caderno</span></button>
         <button className={mode === "progress" ? "active" : ""} onClick={showProgress} aria-current={mode === "progress" ? "page" : undefined}><BarChart3 /><span>Progresso</span></button>
