@@ -8,7 +8,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const user = requireRequestUser(request);
   if (!user) return Response.json({ error: "Não autorizado." }, { status: 401 });
   const { id } = await context.params;
-  const body = (await request.json()) as { notes?: unknown };
+  const body = (await request.json()) as { notes?: unknown; journey?: unknown };
+  if (body.journey !== undefined) {
+    const [updated] = await getDb().update(studies).set({ journeyJson: JSON.stringify(body.journey) }).where(and(eq(studies.id, id), eq(studies.userId, user.id))).returning();
+    if (!updated) return Response.json({ error: "Estudo não encontrado." }, { status: 404 });
+    return Response.json({ study: toStudy(updated) });
+  }
   if (typeof body.notes !== "string") return Response.json({ error: "Anotação inválida." }, { status: 400 });
   const notes = body.notes.slice(0, 10000);
   const [updated] = await getDb().update(studies).set({ notes }).where(and(eq(studies.id, id), eq(studies.userId, user.id))).returning();
