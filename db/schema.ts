@@ -14,6 +14,7 @@ export const studies = sqliteTable(
     devotionalJson: text("devotional_json"),
     readerPrompt: text("reader_prompt").notNull().default(""),
     notes: text("notes").notNull().default(""),
+    journeyJson: text("journey_json"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [index("idx_studies_user_created").on(table.userId, table.createdAt)],
