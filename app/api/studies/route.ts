@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       id, userId: user.id, book, chapters, notes, readerPrompt, generationMode,
       title: result.titulo,
       academicJson: JSON.stringify(result.content),
+      journeyJson: null,
     }).returning();
     return Response.json({ study: { ...toStudy(row), demo: result.demo } }, { status: 201 });
   } catch (error) {
