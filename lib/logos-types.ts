@@ -53,6 +53,44 @@ export type DevotionalStudy = {
   oracao: string;
 };
 
+export type BibleSource = { kind: "BibleSource"; reference: string; version?: string };
+export type BookSource = {
+  kind: "BookSource";
+  title: string;
+  author?: string;
+  cover?: string;
+  required: boolean;
+  purchaseLinks?: { label: string; url: string }[];
+  ebookLink?: string;
+  physicalBookLink?: string;
+  internalReferenceSource?: string;
+};
+export type StudySource = BibleSource | BookSource;
+export type DailyChecklistItem = { id: string; label: string; required: boolean; done: boolean };
+export type DailyLesson = {
+  id: string;
+  title: string;
+  theme: string;
+  objective: string;
+  requiredBookReading: string;
+  suggestedBookSection: string;
+  primaryBibleReading: string;
+  complementaryBibleReadings: string[];
+  estimatedMinutes: number;
+  checklist: DailyChecklistItem[];
+  devotional: DevotionalStudy | null;
+  devotionalVersions?: { id: string; createdAt: string; content: DevotionalStudy }[];
+  reflectionQuestions: string[];
+  answers: { showedMe: string; confrontsBehavior: string; obeyToday: string; practicalAction: string; personalPrayer: string; observations: string };
+  status: "not_started" | "in_progress" | "completed";
+};
+export type StudyJourney = {
+  sources: StudySource[];
+  sections: { id: string; title: string; lessonIds: string[] }[];
+  lessons: DailyLesson[];
+  progress: { startedAt: string; lastActivity: string; lastLessonId: string | null; streak: number };
+};
+
 export type Study = {
   id: string;
   book: string;
@@ -65,4 +103,5 @@ export type Study = {
   notes: string;
   createdAt: string;
   demo?: boolean;
+  journey?: StudyJourney;
 };
