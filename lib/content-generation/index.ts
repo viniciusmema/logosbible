@@ -160,3 +160,13 @@ export async function generateDevotional(input: DevotionalInput) {
 
   return { devotional: result, demo: false as const };
 }
+
+export async function generateProgramDevotional(input: { title: string; theme: string; objective: string; bible: string; complementary: string[]; book: string; referenceNotes: string }) {
+  return generateStructuredJson<DevotionalStudy>({
+    instructions: `${SYSTEM_INSTRUCTIONS}\nVocê está gerando um devocional original para uma lição de um plano de formação. A Bíblia é a fonte principal; o livro cristão é somente apoio interno. Não resuma nem reproduza o livro. Não invente citações.`,
+    schemaName: "logos_program_devotional",
+    schema: devotionalSchema,
+    maxOutputTokens: 2200,
+    input: `Lição: ${input.title}\nTema: ${input.theme}\nObjetivo: ${input.objective}\nTexto bíblico principal: ${input.bible}\nLeituras complementares: ${input.complementary.join(", ")}\nLivro obrigatório atual: ${input.book}\nNotas internas, em paráfrase, das fontes de referência: ${input.referenceNotes}\nGere um devocional com versículo-chave, meditação, o que revela sobre Deus, confronto, aplicação prática, pergunta e oração.`,
+  });
+}
